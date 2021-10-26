@@ -9,30 +9,35 @@ router.get('/chars-remote', async function (req, res) {
     // url is hard-coded
     // code structure
     // assert response format
-    let url = 'http://swapi.dev/api/people';
-    let resData = [];
-    while(url){
-        const resp = await swPaginationHelper(url)
-        if(resp.error) {
-            return res.status(500).send({error: "Unknown error " + error})
+    const operation = async () => {
+        let url = 'http://swapi.dev/api/people';
+        let resData = [];
+        while(url){
+            const resp = await swPaginationHelper(url)
+            resData = resData.concat(resp.data)
+            url = resp.next
         }
-        resData = resData.concat(resp.data)
-        url = resp.next
+        res.send({msg: "success", names: resData});
     }
-    res.send({msg: "success", names: resData});
+
+    await tryOrFailSilently(res, operation)
 })
 
-async function swPaginationHelper(url) {
+async function tryOrFailSilently(res, operation) {
     try {
-        const response = await axios.get(url)
-        if (response.status === 200) {
-            const resData = response.data.results.map( it => it.name)
-            return {data: resData, next: response.data.next}
-        } else {
-            return {error: new Error('External service call failed')}
-        }
+        await operation()
     } catch (error) {
-        return {error}
+        return res.status(500).send({error: "Unknown error " + error})
+    }
+}
+
+async function swPaginationHelper(url) {
+    const response = await axios.get(url)
+    if (response.status === 200) {
+        const resData = response.data.results.map( it => it.name)
+        return {data: resData, next: response.data.next}
+    } else {
+        throw new Error('External service call failed');
     }
 }
 
